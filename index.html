@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Flappy Bird Fix</title>
+    <style>
+        canvas { border: 5px solid #2c3e50; display: block; margin: 20px auto; background: #70c5ce; cursor: pointer; }
+        body { text-align: center; font-family: Arial, sans-serif; background: #ecf0f1; margin: 0; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Flappy Bird</h1>
+    <canvas id="gameCanvas" width="320" height="480"></canvas>
+    <p>Zıplamak için <b>Tıkla</b> veya <b>Boşluk</b></p>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- VARLIKLARI YÜKLE ---
+        const birdImg = new Image();
+        birdImg.src = 'bün.PNG'; 
+
+        // Sesleri Audio objesi olarak tanımlıyoruz (Hata vermemesi için catch ekledik)
+        const scoreSnd = new Audio('ses1.ogg'); 
+        const dieSnd = new Audio('sumo.ogg');
+
+        // --- OYUN AYARLARI ---
+        let gameState = 'START';
+        let bird = { x: 50, y: 150, w: 34, h: 24, gravity: 0.22, lift: -4.8, velocity: 0 };
+        let pipes = [];
+        let frame = 0;
+        let score = 0;
+
+        function resetGame() {
+            bird.y = 150;
+            bird.velocity = 0;
+            pipes = [];
+            score = 0;
+            frame = 0;
+            gameState = 'PLAYING';
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+
+            if (bird.y + bird.h > canvas.height || bird.y < 0) {
+                gameOver();
+            }
+
+            if (frame % 100 === 0) {
+                let gap = 130;
+                let pipeHeight = Math.floor(Math.random() * (canvas.height - gap - 120)) + 60;
+                pipes.push({ x: canvas.width, top: pipeHeight, bottom: pipeHeight + gap, passed: false });
+            }
+
+            pipes.forEach(p => {
+                p.x -= 2;
+                if (!p.passed && bird.x > p.x + 40) {
+                    score++;
+                    p.passed = true;
+                    // Ses dosyası yoksa oyunun çökmesini engeller
+                    scoreSnd.play().catch(e => console.log("Skor sesi bulunamadı"));
+                }
+                if (bird.x < p.x + 40 && bird.x + bird.w > p.x &&
+                    (bird.y < p.top || bird.y + bird.h > p.bottom)) {
+                    gameOver();
+                }
+            });
+            pipes = pipes.filter(p => p.x > -40);
+            frame++;
+        }
+
+        function gameOver() {
+            if (gameState === 'PLAYING') {
+                dieSnd.play().catch(e => console.log("Oyun bitti sesi bulunamadı"));
+            }
+            gameState = 'GAMEOVER';
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Borular
+            ctx.fillStyle = "#2ecc71";
+            pipes.forEach(p => {
+                ctx.fillRect(p.x, 0, 40, p.top);
+                ctx.fillRect(p.x, p.bottom, 40, canvas.height);
+            });
+
+            // Kuş Çizimi (Resim yoksa sarı dikdörtgen çizer)
+            if (birdImg.complete && birdImg.naturalWidth !== 0) {
+                ctx.drawImage(birdImg, bird.x, bird.y, bird.w, bird.h);
+            } else {
+                ctx.fillStyle = "yellow";
+                ctx.fillRect(bird.x, bird.y, bird.w, bird.h);
+            }
+
+            // Skor
+            ctx.fillStyle = "white";
+            ctx.font = "bold 30px Arial";
+            ctx.fillText(score, canvas.width/2 - 10, 50);
+
+            if (gameState === 'START') {
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.font = "20px Arial";
+                ctx.fillText("BAŞLAMAK İÇİN TIKLA", 55, canvas.height/2);
+            }
+
+            if (gameState === 'GAMEOVER') {
+                ctx.fillStyle = "rgba(0,0,0,0.7)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+                ctx.font = "25px Arial";
+                ctx.fillText("OYUN BİTTİ", 90, canvas.height/2 - 20);
+                ctx.fillText("Skor: " + score, 115, canvas.height/2 + 20);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function handleInput(e) {
+            if (e.type === 'touchstart') e.preventDefault();
+            if (gameState === 'START' || gameState === 'GAMEOVER') {
+                resetGame();
+            } else {
+                bird.velocity = bird.lift;
+            }
+        }
+
+        window.addEventListener('keydown', (e) => { if(e.code === 'Space') handleInput(e); });
+        canvas.addEventListener('mousedown', handleInput);
+        canvas.addEventListener('touchstart', handleInput);
+
+        gameLoop();
+    </script>
+</body>
+</html>
